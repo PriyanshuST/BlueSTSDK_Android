@@ -28,8 +28,9 @@ enum class NavigationResponse {
     HEADLIGHTS,
     WARNING_LIGHTS,
     RFU,
-    DISARMED,
-    ARMED
+    REMOTE_CONTROL,
+    FREE_NAVIGATION,
+    FOLLOW_ME
 }
 
 fun isBitSet(value: UInt, bitPosition: Int): Boolean {
@@ -110,7 +111,7 @@ fun getTopologyName(topology: UInt) : List<FeatureField<NavigationResponse>> {
                 )
                 else -> FeatureField(
                     name = "Topology",
-                    value = NavigationResponse.RFU // reserved for future use 15 < .. <= 31
+                    value = NavigationResponse.RFU
                 )
             }
 
@@ -119,4 +120,34 @@ fun getTopologyName(topology: UInt) : List<FeatureField<NavigationResponse>> {
     }
 
     return functionalities
+}
+
+fun getNavigationMode(navigation: UByte) : List<FeatureField<NavigationResponse>> {
+    val navigationModes = mutableListOf<FeatureField<NavigationResponse>>()
+
+    val navigationMode =  when(navigation){
+        0x01.toUByte() -> FeatureField(
+            name = "Navigation Mode",
+            value = NavigationResponse.REMOTE_CONTROL
+        )
+
+        0x02.toUByte() -> FeatureField(
+            name =  "Navigation Mode",
+            value = NavigationResponse.FREE_NAVIGATION
+        )
+
+        0x03.toUByte() -> FeatureField(
+            name = "Navigation Mode",
+            value = NavigationResponse.FOLLOW_ME
+        )
+
+        else -> FeatureField(
+            name = "Navigation Mode",
+            value = NavigationResponse.RFU
+        )
+    }
+
+    navigationModes.add(navigationMode)
+
+    return navigationModes
 }

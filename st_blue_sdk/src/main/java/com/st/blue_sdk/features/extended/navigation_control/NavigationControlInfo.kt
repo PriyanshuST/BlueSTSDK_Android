@@ -15,4 +15,5 @@ data class NavigationControlInfo(
     override fun toString(): String = "To Be Implemented"
 
     override val logDoubleValues: List<Double> = listOf()
+
 }

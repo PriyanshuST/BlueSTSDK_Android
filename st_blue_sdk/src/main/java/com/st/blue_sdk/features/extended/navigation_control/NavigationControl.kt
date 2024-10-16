@@ -10,6 +10,7 @@ import com.st.blue_sdk.features.extended.navigation_control.request.GetRobotTopo
 import com.st.blue_sdk.features.extended.navigation_control.request.MoveCommandDifferentialDrive
 import com.st.blue_sdk.features.extended.navigation_control.request.SetNavigationMode
 import com.st.blue_sdk.features.extended.navigation_control.response.NavigationControlResponse
+import com.st.blue_sdk.features.extended.navigation_control.response.getNavigationMode
 import com.st.blue_sdk.features.extended.navigation_control.response.getTopologyName
 import com.st.blue_sdk.utils.NumberConversion
 
@@ -67,7 +68,7 @@ class NavigationControl(
 
         when (commandType) {
             GET_ROBOT_TOPOLOGY -> {
-                val action = NumberConversion.byteToUInt8(data,dataOffset+1) //action byte Uint8
+                val action = NumberConversion.byteToUInt8(data,dataOffset+1).toUByte() //action byte Uint8
                 val topology = byteArrayToUInt32(data,dataOffset + 2) //converts 4 bytes to Unit32
                 val topologyList = getTopologyName(topology)
 
@@ -79,6 +80,23 @@ class NavigationControl(
                     data = NavigationControlInfo(
                         commandId = commandId,
                         data = topologyList
+                    )
+                )
+            }
+
+            SET_NAVIGATION_MODE -> {
+                val action = NumberConversion.byteToUInt8(data,dataOffset+1).toUByte()
+                val navigationModeId = NumberConversion.byteToUInt8(data,dataOffset+2).toUByte()
+                val navigationMode = getNavigationMode(navigationModeId)
+
+                return FeatureUpdate(
+                    featureName = name,
+                    readByte = data.size,
+                    timeStamp = timeStamp,
+                    rawData = data,
+                    data = NavigationControlInfo(
+                        commandId = commandId,
+                        data = navigationMode
                     )
                 )
             }
@@ -169,6 +187,14 @@ class NavigationControl(
                     return NavigationControlResponse(
                         feature = this,
                         commandId = GET_ROBOT_TOPOLOGY,
+                        payload = it.payload
+                    )
+                }
+
+                SET_NAVIGATION_MODE -> {
+                    return NavigationControlResponse(
+                        feature = this,
+                        commandId = SET_NAVIGATION_MODE,
                         payload = it.payload
                     )
                 }
