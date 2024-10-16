@@ -81,6 +81,7 @@ class FeatureDetailViewModel @Inject constructor(
                     .flowOn(Dispatchers.IO)
                     .onEach {
                         _featureUpdates.value = it
+
                     }.launchIn(viewModelScope)
         }
     }

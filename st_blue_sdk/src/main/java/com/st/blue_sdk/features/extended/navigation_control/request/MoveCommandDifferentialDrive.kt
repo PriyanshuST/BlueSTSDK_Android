@@ -11,5 +11,4 @@ class MoveCommandDifferentialDrive(
         val rightMode : UByte = 0x00u,
         val rightWheel : Short,
         val res : Long
-    ) :
-    FeatureCommand(feature = feature , commandId = NavigationControl.MOVE_COMMAND_DIFFERENTIAL_DRIVE)
+    ) : FeatureCommand(feature = feature , commandId = NavigationControl.MOVE_COMMAND_DIFFERENTIAL_DRIVE)

@@ -4,11 +4,14 @@ import com.st.blue_sdk.features.Feature
 import com.st.blue_sdk.features.FeatureCommand
 import com.st.blue_sdk.features.FeatureResponse
 import com.st.blue_sdk.features.FeatureUpdate
+import com.st.blue_sdk.features.extended.navigation_control.request.CoordinateOrigin
+import com.st.blue_sdk.features.extended.navigation_control.request.CurrentCoordinate
 import com.st.blue_sdk.features.extended.navigation_control.request.GetRobotTopology
 import com.st.blue_sdk.features.extended.navigation_control.request.MoveCommandDifferentialDrive
-import com.st.blue_sdk.features.extended.navigation_control.response.GetRobotTopologyResponse
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import com.st.blue_sdk.features.extended.navigation_control.request.SetNavigationMode
+import com.st.blue_sdk.features.extended.navigation_control.response.NavigationControlResponse
+import com.st.blue_sdk.features.extended.navigation_control.response.getTopologyName
+import com.st.blue_sdk.utils.NumberConversion
 
 class NavigationControl(
     name: String = NAME,
@@ -29,6 +32,25 @@ class NavigationControl(
         const val COORDINATE_ORIGIN : Byte = 0x22
         const val CURRENT_COORDINATE : Byte = 0x23
         const val MOVE_COMMAND_DIFFERENTIAL_DRIVE : Byte = 0x24
+
+        fun getCommandType(commandCode: Short) = when (commandCode) {
+            0X10.toShort() -> GET_ROBOT_TOPOLOGY
+            0X21.toShort() -> SET_NAVIGATION_MODE
+            0X22.toShort() -> COORDINATE_ORIGIN
+            0X23.toShort() -> CURRENT_COORDINATE
+            0X24.toShort() -> MOVE_COMMAND_DIFFERENTIAL_DRIVE
+
+            else -> throw IllegalArgumentException("Unknown command type: $commandCode")
+        }
+
+        fun byteArrayToUInt32(data: ByteArray, dataOffset: Int): UInt {
+            require(data.size >= dataOffset + 4) { "Not enough bytes to convert to UInt32" }
+
+            return ((data[dataOffset].toUInt() and 0xFFu) shl 24) or
+                    ((data[dataOffset + 1].toUInt() and 0xFFu) shl 16) or
+                    ((data[dataOffset + 2].toUInt() and 0xFFu) shl 8) or
+                    (data[dataOffset + 3].toUInt() and 0xFFu)
+        }
     }
 
     override fun extractData(
@@ -38,17 +60,88 @@ class NavigationControl(
     ): FeatureUpdate<NavigationControlInfo> {
         require(data.size - dataOffset > 0) { "There are no bytes available to read for $name feature" }
 
-        return FeatureUpdate(
-            featureName = name,
-            readByte = data.size,
-            timeStamp = timeStamp,
-            rawData = data,
-            data = NavigationControlInfo(name = "Place holder")
-        )
+        //it contains the first byte after data offset
+        val commandId = NumberConversion.byteToUInt8(data,dataOffset)
+
+        val commandType = getCommandType(commandId)
+
+        when (commandType) {
+            GET_ROBOT_TOPOLOGY -> {
+                val action = NumberConversion.byteToUInt8(data,dataOffset+1) //action byte Uint8
+                val topology = byteArrayToUInt32(data,dataOffset + 2) //converts 4 bytes to Unit32
+                val topologyList = getTopologyName(topology)
+
+                return FeatureUpdate(
+                    featureName = name,
+                    readByte = data.size,
+                    timeStamp = timeStamp,
+                    rawData = data,
+                    data = NavigationControlInfo(
+                        commandId = commandId,
+                        data = topologyList
+                    )
+                )
+            }
+
+            else -> return FeatureUpdate(
+                featureName = name,
+                readByte = data.size,
+                timeStamp = timeStamp,
+                rawData = data,
+                data = NavigationControlInfo(
+                    commandId = 0,
+                    data = null
+                )
+            )
+        }
     }
 
     override fun packCommandData(featureBit: Int?, command: FeatureCommand): ByteArray?{
         return when(command){
+            is GetRobotTopology -> packCommandRequest(
+                featureBit,
+                GET_ROBOT_TOPOLOGY,
+                byteArrayOf(
+                    command.action.toByte(),
+                )
+            )
+
+            is SetNavigationMode -> packCommandRequest(
+                featureBit,
+                SET_NAVIGATION_MODE,
+                byteArrayOf(
+                    command.action.toByte(),
+                    command.navigationMode.toByte(),
+                    command.armed.toByte(),
+                    command.res.toByte()
+                )
+            )
+
+            is CoordinateOrigin -> packCommandRequest(
+                featureBit,
+                COORDINATE_ORIGIN,
+                byteArrayOf(
+                    command.action.toByte(),
+                    command.xCoordinate.toByte(),
+                    command.yCoordinate.toByte(),
+                    command.theta.toByte(),
+                    command.res.toByte()
+                )
+            )
+
+            is CurrentCoordinate -> packCommandRequest(
+                featureBit,
+                CURRENT_COORDINATE,
+                byteArrayOf(
+                    command.action.toByte(),
+                    command.xCoordinate.toByte(),
+                    command.yCoordinate.toByte(),
+                    command.theta.toByte(),
+                    command.interval.toByte(),
+                    command.res.toByte()
+                )
+            )
+
             is MoveCommandDifferentialDrive -> packCommandRequest(
                 featureBit,
                 MOVE_COMMAND_DIFFERENTIAL_DRIVE,
@@ -59,14 +152,6 @@ class NavigationControl(
                     command.rightMode.toByte(),
                     command.rightWheel.toByte(),
                     command.res.toByte()
-                )
-            )
-
-            is GetRobotTopology -> packCommandRequest(
-                featureBit,
-                GET_ROBOT_TOPOLOGY,
-                byteArrayOf(
-                    command.action.toByte(),
                 )
             )
 
@@ -81,11 +166,7 @@ class NavigationControl(
 
             when(it.commandId){
                 GET_ROBOT_TOPOLOGY -> {
-                    val topology: Long = ByteBuffer.wrap(it.payload,2,4)
-                        .order(ByteOrder.BIG_ENDIAN)
-                        .int.toLong()
-
-                    return GetRobotTopologyResponse(
+                    return NavigationControlResponse(
                         feature = this,
                         commandId = GET_ROBOT_TOPOLOGY,
                         payload = it.payload
