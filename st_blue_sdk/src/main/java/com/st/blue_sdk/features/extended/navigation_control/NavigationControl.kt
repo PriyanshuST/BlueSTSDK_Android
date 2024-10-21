@@ -7,7 +7,8 @@ import com.st.blue_sdk.features.FeatureUpdate
 import com.st.blue_sdk.features.extended.navigation_control.request.CoordinateOrigin
 import com.st.blue_sdk.features.extended.navigation_control.request.CurrentCoordinate
 import com.st.blue_sdk.features.extended.navigation_control.request.GetRobotTopology
-import com.st.blue_sdk.features.extended.navigation_control.request.MoveCommandDifferentialDrive
+import com.st.blue_sdk.features.extended.navigation_control.request.MoveCommandDifferentialDrivePWMSpeed
+import com.st.blue_sdk.features.extended.navigation_control.request.MoveCommandDifferentialDriveSimpleMove
 import com.st.blue_sdk.features.extended.navigation_control.request.SetNavigationMode
 import com.st.blue_sdk.features.extended.navigation_control.response.NavigationControlResponse
 import com.st.blue_sdk.features.extended.navigation_control.response.getNavigationMode
@@ -32,14 +33,16 @@ class NavigationControl(
         const val SET_NAVIGATION_MODE : Byte = 0x21
         const val COORDINATE_ORIGIN : Byte = 0x22
         const val CURRENT_COORDINATE : Byte = 0x23
-        const val MOVE_COMMAND_DIFFERENTIAL_DRIVE : Byte = 0x24
+        const val MOVE_COMMAND_DIFFERENTIAL_DRIVE_PWM_SPEED : Byte = 0x24
+        const val MOVE_COMMAND_DIFFERENTIAL_DRIVE_SIMPLE_MOVE : Byte = 0x25
 
         fun getCommandType(commandCode: Short) = when (commandCode) {
             0X10.toShort() -> GET_ROBOT_TOPOLOGY
             0X21.toShort() -> SET_NAVIGATION_MODE
             0X22.toShort() -> COORDINATE_ORIGIN
             0X23.toShort() -> CURRENT_COORDINATE
-            0X24.toShort() -> MOVE_COMMAND_DIFFERENTIAL_DRIVE
+            0X24.toShort() -> MOVE_COMMAND_DIFFERENTIAL_DRIVE_PWM_SPEED
+            0x25.toShort() -> MOVE_COMMAND_DIFFERENTIAL_DRIVE_SIMPLE_MOVE
 
             else -> throw IllegalArgumentException("Unknown command type: $commandCode")
         }
@@ -68,8 +71,8 @@ class NavigationControl(
 
         when (commandType) {
             GET_ROBOT_TOPOLOGY -> {
-                val action = NumberConversion.byteToUInt8(data,dataOffset+1).toUByte() //action byte Uint8
-                val topology = byteArrayToUInt32(data,dataOffset + 2) //converts 4 bytes to Unit32
+                val action = NumberConversion.byteToUInt8(data,dataOffset+1).toUByte()
+                val topology = byteArrayToUInt32(data,dataOffset + 2)
                 val topologyList = getTopologyName(topology)
 
                 return FeatureUpdate(
@@ -160,9 +163,9 @@ class NavigationControl(
                 )
             )
 
-            is MoveCommandDifferentialDrive -> packCommandRequest(
+            is MoveCommandDifferentialDrivePWMSpeed -> packCommandRequest(
                 featureBit,
-                MOVE_COMMAND_DIFFERENTIAL_DRIVE,
+                MOVE_COMMAND_DIFFERENTIAL_DRIVE_PWM_SPEED,
                 byteArrayOf(
                     command.action.toByte() ,
                     command.leftMode.toByte(),
@@ -171,6 +174,17 @@ class NavigationControl(
                     command.rightWheel.toByte(),
                     command.res.toByte()
                 )
+            )
+
+            is MoveCommandDifferentialDriveSimpleMove -> packCommandRequest(
+                featureBit,
+                MOVE_COMMAND_DIFFERENTIAL_DRIVE_SIMPLE_MOVE,
+                data = byteArrayOf(
+                    command.action.toByte() ,
+                    command.direction.toByte(),
+                    command.speed.toByte(),
+                    command.angle.toByte(),
+                ) + command.res
             )
 
             else -> null
