@@ -140,7 +140,10 @@ fun readRawPnPLFormat(
                                     } else {
                                         val customString =
                                             (singleEntry.value as JsonPrimitive).content
-                                        val jsonDec = Json { encodeDefaults = true }
+                                        val jsonDec = Json {
+                                            encodeDefaults = true
+                                            ignoreUnknownKeys = true
+                                        }
                                         customFormat =
                                             try {
                                                 jsonDec.decodeFromString<RawCustom>(customString)
@@ -158,18 +161,27 @@ fun readRawPnPLFormat(
                                         propertyName = RawControlled.PROPERTY_NAME_ST_BLE_STREAM,
                                         fieldName = name
                                     )
+
+                                    val jsonDec = Json {
+                                        encodeDefaults = true
+                                        ignoreUnknownKeys = true
+                                    }
+
                                     val format =
-                                        Json.decodeFromJsonElement<RawPnPLEntryFormat>(
+                                        jsonDec.decodeFromJsonElement<RawPnPLEntryFormat>(
                                             singleEntry.value
                                         )
 
                                     //Try to decode the Enum Format
-                                    if (format.format == RawPnPLEntryFormat.RawPnPLEntryFormat.enum) {
+                                    if ((format.format == RawPnPLEntryFormat.RawPnPLEntryFormat.enum)  || (format.format == RawPnPLEntryFormat.RawPnPLEntryFormat.enum_t)){
                                         try {
                                             val customString =
                                                 (singleEntry.value as JsonObject)["labels"]?.jsonPrimitive?.content
                                             customString?.let {
-                                                val jsonDec = Json { encodeDefaults = true }
+                                                val jsonDec = Json {
+                                                    encodeDefaults = true
+                                                    ignoreUnknownKeys = true
+                                                }
                                                 val labelsParsed =
                                                     //try {
                                                     jsonDec.decodeFromString<List<RawPnPLEntryEnumLabel>>(
@@ -244,7 +256,7 @@ fun decodeRawData(
 
                     when (formatRawPnpLEntry.format.format) {
                         RawPnPLEntryFormat.RawPnPLEntryFormat.int8_t -> {
-                            for (index in 0 until (formatRawPnpLEntry.format.elements*formatRawPnpLEntry.format.channels)) {
+                            for (index in 0 until (formatRawPnpLEntry.format.elements * formatRawPnpLEntry.format.channels)) {
                                 if (rawData.size > counter) {
 
                                     val value = rawData[counter]
@@ -262,7 +274,7 @@ fun decodeRawData(
                         }
 
                         RawPnPLEntryFormat.RawPnPLEntryFormat.uint8_t -> {
-                            for (index in 0 until (formatRawPnpLEntry.format.elements*formatRawPnpLEntry.format.channels)) {
+                            for (index in 0 until (formatRawPnpLEntry.format.elements * formatRawPnpLEntry.format.channels)) {
                                 if (rawData.size >= counter) {
 
                                     val value = NumberConversion.byteToUInt8(
@@ -283,7 +295,7 @@ fun decodeRawData(
                         }
 
                         RawPnPLEntryFormat.RawPnPLEntryFormat.uint16_t -> {
-                            for (index in 0 until (formatRawPnpLEntry.format.elements*formatRawPnpLEntry.format.channels)) {
+                            for (index in 0 until (formatRawPnpLEntry.format.elements * formatRawPnpLEntry.format.channels)) {
                                 if (rawData.size >= (counter + 2)) {
 
                                     val value = NumberConversion.LittleEndian.bytesToUInt16(
@@ -304,7 +316,7 @@ fun decodeRawData(
                         }
 
                         RawPnPLEntryFormat.RawPnPLEntryFormat.int16_t -> {
-                            for (index in 0 until (formatRawPnpLEntry.format.elements*formatRawPnpLEntry.format.channels)) {
+                            for (index in 0 until (formatRawPnpLEntry.format.elements * formatRawPnpLEntry.format.channels)) {
                                 if (rawData.size >= (counter + 2)) {
 
                                     val value = NumberConversion.LittleEndian.bytesToInt16(
@@ -325,7 +337,7 @@ fun decodeRawData(
                         }
 
                         RawPnPLEntryFormat.RawPnPLEntryFormat.uint32_t -> {
-                            for (index in 0 until (formatRawPnpLEntry.format.elements*formatRawPnpLEntry.format.channels)) {
+                            for (index in 0 until (formatRawPnpLEntry.format.elements * formatRawPnpLEntry.format.channels)) {
                                 if (rawData.size >= (counter + 4)) {
 
                                     val value = NumberConversion.LittleEndian.bytesToUInt32(
@@ -346,7 +358,7 @@ fun decodeRawData(
                         }
 
                         RawPnPLEntryFormat.RawPnPLEntryFormat.int32_t -> {
-                            for (index in 0 until (formatRawPnpLEntry.format.elements*formatRawPnpLEntry.format.channels)) {
+                            for (index in 0 until (formatRawPnpLEntry.format.elements * formatRawPnpLEntry.format.channels)) {
                                 if (rawData.size >= (counter + 4)) {
 
                                     val value = NumberConversion.LittleEndian.bytesToInt32(
@@ -366,8 +378,9 @@ fun decodeRawData(
                             }
                         }
 
-                        RawPnPLEntryFormat.RawPnPLEntryFormat.float -> {
-                            for (index in 0 until (formatRawPnpLEntry.format.elements*formatRawPnpLEntry.format.channels)) {
+                        RawPnPLEntryFormat.RawPnPLEntryFormat.float,
+                        RawPnPLEntryFormat.RawPnPLEntryFormat.float_t-> {
+                            for (index in 0 until (formatRawPnpLEntry.format.elements * formatRawPnpLEntry.format.channels)) {
                                 if (rawData.size >= (counter + 4)) {
                                     var value = NumberConversion.LittleEndian.bytesToFloat(
                                         rawData,
@@ -385,8 +398,9 @@ fun decodeRawData(
                             }
                         }
 
-                        RawPnPLEntryFormat.RawPnPLEntryFormat.enum -> {
-                            for (index in 0 until (formatRawPnpLEntry.format.elements*formatRawPnpLEntry.format.channels)) {
+                        RawPnPLEntryFormat.RawPnPLEntryFormat.enum,
+                        RawPnPLEntryFormat.RawPnPLEntryFormat.enum_t-> {
+                            for (index in 0 until (formatRawPnpLEntry.format.elements * formatRawPnpLEntry.format.channels)) {
                                 if (rawData.size > counter) {
                                     var value = NumberConversion.byteToUInt8(
                                         rawData,

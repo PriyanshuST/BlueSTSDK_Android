@@ -55,6 +55,9 @@ object Boards {
         /** SensorTile.Box PROB  */
         SENSOR_TILE_BOX_PROB,
 
+        /** SensorTile.Box PROC  */
+        SENSOR_TILE_BOX_PROC,
+
         /** STWIN.BOX  */
         STWIN_BOX,
 
@@ -67,17 +70,30 @@ object Boards {
         /** STDES-CBMLoRaBLE  */
         STDES_CBMLORABLE,
 
+        /** STEAVL-ROBKIT1 */
+        ROBKIT1,
+
         /** WB Boards  */
         WB55_NUCLEO_BOARD, //0x81
-        WB5M_DISCOVERY_BOARD, //0x82
+        STM32WB5MM_DK, //0x82
         WB55_USB_DONGLE_BOARD, //0x83
-        WB15_NUCLEO_BOARD, //0x84
-        WB1M_DISCOVERY_BOARD, //0x85
-        WBA5X_NUCLEO_BOARD, //0x8B
-        WBA_DISCOVERY_BOARD, //0x8C
+        WB15CC_NUCLEO_BOARD, //0x84
+        B_WB1M_WPAN1, //0x85
+        WB55CG_NUCLEO_BOARD, //0x8B
+        STM32WBA55G_DK1, //0x8C
+        WBA65RI_NUCLEO_BOARD, //0x8E
+        STM32WBA65I_DK1, //0x92
+        WBA2_NUCLEO_BOARD, //0x90
+        /** ST67W6X WBA+Wi-Fi board*/
+        ST67W6X, //0x9A
+
+
+        /** WB Boards Not yet supported */
+        B_WBA5M_WPAN, //0x91
 
         /** Nucleo with STM32WB0X */
-        WB0X_NUCLEO_BOARD,
+        WB0X_NUCLEO_BOARD, //0x8D
+        WB05_NUCLEO_BOARD, //0x8F
 
         /** NUCLEO boards  */
         NUCLEO, NUCLEO_F401RE, NUCLEO_L476RG, NUCLEO_L053R8, NUCLEO_F446RE,NUCLEO_U575ZIQ,NUCLEO_U5A5ZJQ
@@ -90,7 +106,8 @@ object Boards {
         BLUENRG_FAMILY,
         WB_BASED_FAMILY,
         WB_FAMILY,
-        WBA_FAMILY
+        WBA_FAMILY,
+        WB_NOT_YET_SUPPORTED
     }
 
     fun containsRemoteFeatures(id:Int,sDkVersion: Int): Boolean {
@@ -108,8 +125,11 @@ object Boards {
             Model.STEVAL_STWINKT1B,
             Model.SENSOR_TILE_BOX_PRO,
             Model.SENSOR_TILE_BOX_PROB,
+            Model.SENSOR_TILE_BOX_PROC,
             Model.STWIN_BOX,
-            Model.STWIN_BOXB -> Family.BLUENRG_FAMILY
+            Model.STWIN_BOXB,
+            Model.ROBKIT1,
+            Model.WB05_NUCLEO_BOARD-> Family.BLUENRG_FAMILY
 
             Model.DISCOVERY_IOT01A,
             Model.B_L475E_IOT01A,
@@ -125,18 +145,22 @@ object Boards {
             Model.NUCLEO_L053R8,
             Model.NUCLEO_F446RE,
             Model.NUCLEO_U575ZIQ,
-            Model.NUCLEO_U5A5ZJQ-> Family.NUCLEO_FAMILY
+            Model.NUCLEO_U5A5ZJQ -> Family.NUCLEO_FAMILY
 
             Model.WB55_NUCLEO_BOARD,
-            Model.WB5M_DISCOVERY_BOARD,
+            Model.STM32WB5MM_DK,
             Model.WB55_USB_DONGLE_BOARD,
-            Model.WB15_NUCLEO_BOARD,
-            Model.WB1M_DISCOVERY_BOARD,
-                -> Family.WB_FAMILY
+            Model.WB15CC_NUCLEO_BOARD,
+            Model.B_WB1M_WPAN1 -> Family.WB_FAMILY
 
-            Model.WBA5X_NUCLEO_BOARD,
-            Model.WBA_DISCOVERY_BOARD,
-                -> Family.WBA_FAMILY
+            Model.WB55CG_NUCLEO_BOARD,
+            Model.STM32WBA55G_DK1,
+            Model.STM32WBA65I_DK1,
+            Model.WBA65RI_NUCLEO_BOARD,
+            Model.WBA2_NUCLEO_BOARD,
+            Model.ST67W6X -> Family.WBA_FAMILY
+
+            Model.B_WBA5M_WPAN -> Family.WB_NOT_YET_SUPPORTED
 
             Model.WB0X_NUCLEO_BOARD,
             Model.GENERIC,
@@ -168,6 +192,8 @@ object Boards {
                     0x10 -> Model.STDES_CBMLORABLE
                     0x11 -> Model.SENSOR_TILE_BOX_PROB
                     0x12 -> Model.STWIN_BOXB
+                    0x13 -> Model.SENSOR_TILE_BOX_PROC
+                    0xC3 -> Model.ROBKIT1
                     0x80 -> Model.NUCLEO
                     0x7F -> Model.NUCLEO_F401RE
                     0x7E -> Model.NUCLEO_L476RG
@@ -176,12 +202,18 @@ object Boards {
                     0x7B -> Model.NUCLEO_U575ZIQ
                     0x7A -> Model.NUCLEO_U5A5ZJQ
                     0x8D -> Model.WB0X_NUCLEO_BOARD
+                    0x8E -> Model.WBA65RI_NUCLEO_BOARD
+                    0x8F -> Model.WB05_NUCLEO_BOARD
+                    0x90 -> Model.WBA2_NUCLEO_BOARD
+                    0x91 -> Model.B_WBA5M_WPAN
+                    0x92 -> Model.STM32WBA65I_DK1
+                    0x9A -> Model.ST67W6X
                     else -> {
                         if (temp in 0x81..0x8A) {
                             Model.WB55_NUCLEO_BOARD
                         } else {
                             if (temp in 0x8B..0x8C) {
-                                Model.WBA5X_NUCLEO_BOARD
+                                Model.WB55CG_NUCLEO_BOARD
                             } else {
                                 Model.GENERIC
                             }
@@ -208,6 +240,8 @@ object Boards {
                     0x10 -> Model.STDES_CBMLORABLE
                     0x11 -> Model.SENSOR_TILE_BOX_PROB
                     0x12 -> Model.STWIN_BOXB
+                    0x13 -> Model.SENSOR_TILE_BOX_PROC
+                    0xC3 -> Model.ROBKIT1
                     0x80 -> Model.NUCLEO
                     0x7F -> Model.NUCLEO_F401RE
                     0x7E -> Model.NUCLEO_L476RG
@@ -218,14 +252,20 @@ object Boards {
 
 
                     0x81 -> Model.WB55_NUCLEO_BOARD
-                    0x82 -> Model.WB5M_DISCOVERY_BOARD
+                    0x82 -> Model.STM32WB5MM_DK
                     0x83 -> Model.WB55_USB_DONGLE_BOARD
-                    0x84 -> Model.WB15_NUCLEO_BOARD
-                    0x85 -> Model.WB1M_DISCOVERY_BOARD
-                    0x8B -> Model.WBA5X_NUCLEO_BOARD
-                    0x8C -> Model.WBA_DISCOVERY_BOARD
-
+                    0x84 -> Model.WB15CC_NUCLEO_BOARD
+                    0x85 -> Model.B_WB1M_WPAN1
+                    0x8B -> Model.WB55CG_NUCLEO_BOARD
+                    0x8C -> Model.STM32WBA55G_DK1
                     0x8D -> Model.WB0X_NUCLEO_BOARD
+                    0x8E -> Model.WBA65RI_NUCLEO_BOARD
+                    0x8F -> Model.WB05_NUCLEO_BOARD
+
+                    0x90 -> Model.WBA2_NUCLEO_BOARD
+                    0x91 -> Model.B_WBA5M_WPAN
+                    0x92 -> Model.STM32WBA65I_DK1
+                    0x9A -> Model.ST67W6X
 
 
                     else -> Model.GENERIC

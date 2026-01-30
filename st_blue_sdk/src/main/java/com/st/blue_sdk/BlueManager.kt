@@ -22,6 +22,7 @@ import com.st.blue_sdk.features.FeatureUpdate
 import com.st.blue_sdk.logger.Logger
 import com.st.blue_sdk.models.ChunkProgress
 import com.st.blue_sdk.models.Node
+import com.st.blue_sdk.models.LeNode
 import com.st.blue_sdk.services.debug.DebugMessage
 import com.st.blue_sdk.services.fw_version.FwVersionBoard
 import com.st.blue_sdk.services.ota.FwConsole
@@ -47,6 +48,8 @@ interface BlueManager {
 
     suspend fun scanNodes(): Flow<Resource<List<Node>>>
 
+    suspend fun scanLeNodes(): Flow<Resource<List<LeNode>>>
+
     fun stopScan()
 
     fun getRssi(nodeId: String)
@@ -69,7 +72,7 @@ interface BlueManager {
 
     fun nodeFeatures(nodeId: String): List<Feature<*>>
 
-    suspend fun getNodeWithFirmwareInfo(nodeId: String): Node
+    suspend fun getNodeWithFirmwareInfo(nodeId: String): Node?
 
     suspend fun enableFeatures(
         nodeId: String, features: List<Feature<*>>,
@@ -90,6 +93,8 @@ interface BlueManager {
         feature: Feature<*>,
         timeout: Long = 2000
     ): List<FeatureUpdate<*>>
+
+    fun hasBleDebugService(nodeId: String) : Boolean
 
     suspend fun writeDebugMessage(nodeId: String, msg: String): Boolean
 
@@ -113,7 +118,9 @@ interface BlueManager {
 
     suspend fun getBoardsDescription(): List<BoardDescription>
 
-    suspend fun reset(url: String? = null)
+    suspend fun reset(url: String? = null,hideNotReleaseFwMaturity: Boolean?=null)
+
+    suspend fun setHideNotReleaseFwMaturity(hideNotReleaseFwMaturity: Boolean)
 
     suspend fun getDtmiModel(nodeId: String, isBeta: Boolean): DtmiModel?
 

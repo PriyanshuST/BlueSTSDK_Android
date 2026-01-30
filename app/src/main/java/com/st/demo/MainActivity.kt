@@ -7,11 +7,18 @@
  */
 package com.st.demo
 
+import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.Modifier
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -27,9 +34,20 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+
+        enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT,Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT,Color.TRANSPARENT))
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+        }
+
         super.onCreate(savedInstanceState)
+
         setContent {
-            MainScreen()
+            Box(Modifier.safeDrawingPadding()) {
+                MainScreen()
+            }
         }
     }
 }
@@ -39,7 +57,8 @@ private fun MainScreen() {
     val navController = rememberNavController()
 
     StDemoTheme {
-        NavHost(navController = navController, startDestination = "list") {
+        NavHost(
+            navController = navController, startDestination = "list") {
 
             composable(route = "list") {
                 BleDeviceList(

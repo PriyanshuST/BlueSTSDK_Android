@@ -26,10 +26,10 @@ object ApiModule {
     @Singleton
     fun provideBoardCatalogDB(@ApplicationContext context: Context): BoardCatalogDB =
         Room.databaseBuilder(
-            context,
-            BoardCatalogDB::class.java,
-            "blue_st_sdk_db"
-        ).fallbackToDestructiveMigration().build()
+                context,
+                BoardCatalogDB::class.java,
+                "blue_st_sdk_db"
+            ).fallbackToDestructiveMigration(true).build()
 
     @Provides
     @Singleton

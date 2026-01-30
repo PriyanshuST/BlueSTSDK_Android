@@ -20,7 +20,7 @@ apply {
 
 android {
     namespace = "com.st.blue_sdk"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26
@@ -37,6 +37,13 @@ android {
                 name = "DB_BASE_URL",
                 value = "\"https://s3.amazonaws.com/st_test/STBLESensor/\""
             )
+
+            buildConfigField(
+                type = "String",
+                name = "PROD_CATALOG_VERSION",
+                value = "\"5.3.0\""
+            )
+
             buildConfigField(
                 type = "String",
                 name = "BLUESTSDK_DB_BASE_URL",
@@ -57,6 +64,12 @@ android {
                 name = "DTMI_AZURE_DB_BASE_URL",
                 value = "\"https://devicemodels.azure.com/%s.expanded.json\""
             )
+
+            buildConfigField(
+                type = "String",
+                name = "PROD_CATALOG_VERSION",
+                value = "\"5.3.0\""
+            )
         }
 
         release {
@@ -65,6 +78,13 @@ android {
                 name = "DB_BASE_URL",
                 value = "\"https://s3.amazonaws.com/st_test/STBLESensor/\""
             )
+
+            buildConfigField(
+                type = "String",
+                name = "PROD_CATALOG_VERSION",
+                value = "\"5.3.0\""
+            )
+            
             buildConfigField(
                 type = "String",
                 name = "BLUESTSDK_DB_BASE_URL",
@@ -94,8 +114,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     buildFeatures {

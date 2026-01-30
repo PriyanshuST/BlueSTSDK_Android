@@ -13,22 +13,23 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.jaredsburrowsLicense)
 }
 
 android {
     namespace = "com.st.demo"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.st.demo"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 7
-        versionName = "5.2.5"
+        targetSdk = 36
+        versionCode = 13
+        versionName = "5.2.13"
 
         vectorDrawables { useSupportLibrary = true }
 
-        manifestPlaceholders["appAuthRedirectScheme"] = "stdemo"
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.st.demo"
     }
 
     hilt {
@@ -47,8 +48,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     buildFeatures {
@@ -56,9 +57,6 @@ android {
         compose = true
     }
 
-    composeCompiler {
-        enableStrongSkippingMode = true
-    }
 
     ksp {
         arg("room.schemaLocation", "$projectDir/schemas")
@@ -71,6 +69,27 @@ android {
     }
 
     packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
+}
+
+licenseReport {
+    // Generate reports
+    generateCsvReport = false
+    generateHtmlReport = true
+    generateJsonReport = false
+    generateTextReport = false
+
+    // Copy reports - These options are ignored for Java projects
+    copyCsvReportToAssets = false
+    copyHtmlReportToAssets = true
+    copyJsonReportToAssets = false
+    copyTextReportToAssets = false
+    useVariantSpecificAssetDirs = false
+
+    // Ignore licenses for certain artifact patterns
+    //ignoredPatterns = []
+
+    // Show versions in the report - default is false
+    showVersions = true
 }
 
 dependencies {

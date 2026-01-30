@@ -4,7 +4,7 @@ Module for creating the BlueST-SDK library
 
 ## For using it
 
-Code compiled using gradle 8.7 and JDK 17.0.11
+Code compiled using gradle 8.14.3
 
 set on Gradle properties the Github Login name and SSO authentication
 Example:
@@ -14,7 +14,7 @@ GPR_API_KEY=XXXXXXXXXXXXXXXXXXXXXXXX
 
 ## Sample app
 
-This package provides a sample application with some basic functionalites:
+This package provides a sample application with some basic functionalities:
 - boards discovery and connection
 - subscribe to each exported bluetooth SDK features and display the sensors' values in textual way
 
@@ -22,6 +22,10 @@ This package provides a sample application with some basic functionalites:
 ## st-blue-sdk and st-opus libraries
 
 This package provides 2 libraries that could be included on the other STMicroelectronics' applications
+
+They are released [like maven packages](https://github.com/orgs/STMicroelectronics/packages)
+
+
 
 For compiling these 2 libraries is necessary to enable all the gradle tasks
 So:

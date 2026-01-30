@@ -25,6 +25,8 @@ import com.st.blue_sdk.board_catalog.models.Sensor
 import com.st.blue_sdk.bt.advertise.AdvertiseFilter
 import com.st.blue_sdk.bt.advertise.BlueNRGAdvertiseFilter
 import com.st.blue_sdk.bt.advertise.BlueSTSDKAdvertiseFilter
+import com.st.blue_sdk.bt.advertise.LeAdvertiseFilter
+import com.st.blue_sdk.bt.advertise.LeBlueSTSDKAdvertiseFilter
 import com.st.blue_sdk.bt.advertise.getFwInfo
 import com.st.blue_sdk.common.Resource
 import com.st.blue_sdk.features.Feature
@@ -37,6 +39,7 @@ import com.st.blue_sdk.features.exported.ExportedAudioOpusVoiceFeature
 import com.st.blue_sdk.features.exported.ExportedFeature
 import com.st.blue_sdk.logger.Logger
 import com.st.blue_sdk.models.ChunkProgress
+import com.st.blue_sdk.models.LeNode
 import com.st.blue_sdk.models.Node
 import com.st.blue_sdk.services.NodeServerConsumer
 import com.st.blue_sdk.services.NodeServerProducer
@@ -54,6 +57,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOn
 import java.util.*
 import javax.inject.Inject
@@ -62,7 +66,7 @@ import javax.inject.Singleton
 
 @Singleton
 class BlueManagerImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val bleManager: BluetoothManager,
     private val catalog: BoardCatalogRepo,
     private val nodeServiceConsumer: NodeServiceConsumer,
@@ -72,7 +76,7 @@ class BlueManagerImpl @Inject constructor(
     private val otaService: OtaService
 ) : BlueManager {
 
-    private var serverWasEnable=true
+    private var serverWasEnable = true
 
     companion object {
         private val TAG = BlueManager::class.java.simpleName
@@ -82,7 +86,9 @@ class BlueManagerImpl @Inject constructor(
 
     init {
         EXPORTED_MAP[UUID.fromString(EXPORTED_SERVICE)] = listOf(
-            ExportedAudioOpusVoiceFeature(), ExportedAudioOpusConfFeature(), ExportedAudioOpusMusicFeature()
+            ExportedAudioOpusVoiceFeature(),
+            ExportedAudioOpusConfFeature(),
+            ExportedAudioOpusMusicFeature()
         )
     }
 
@@ -94,27 +100,29 @@ class BlueManagerImpl @Inject constructor(
 
     override fun getAllLoggers(nodeId: String): List<Logger> {
         val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
-
-        return service.getAllLoggers()
+        //?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        return service?.getAllLoggers() ?: listOf()
     }
 
     override fun anyFeatures(nodeId: String, features: List<String>): Boolean {
         val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
-
-        return service.getNodeFeatures().any {
+        //?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        return service?.getNodeFeatures()?.any {
             features.contains(it.name)
-        }
+        } ?: false
     }
 
     override fun allFeatures(nodeId: String, features: List<String>): Boolean {
         val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        // ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
 
-        return service.getNodeFeatures().filter {
-            features.contains(it.name)
-        }.distinctBy { it.name }.size == features.distinct().size
+        return if (service == null) {
+            false
+        } else {
+            service.getNodeFeatures().filter {
+                features.contains(it.name)
+            }.distinctBy { it.name }.size == features.distinct().size
+        }
     }
 
     override fun addAllLoggers(loggers: List<Logger>) {
@@ -125,9 +133,7 @@ class BlueManagerImpl @Inject constructor(
         if (nodeId == null) {
             nodeServiceConsumer.getNodeServices().forEach { it.disableAllLoggers(loggerTags) }
         } else {
-            nodeServiceConsumer.getNodeService(nodeId)?.let { service ->
-                service.disableAllLoggers(loggerTags)
-            }
+            nodeServiceConsumer.getNodeService(nodeId)?.disableAllLoggers(loggerTags)
         }
     }
 
@@ -135,9 +141,7 @@ class BlueManagerImpl @Inject constructor(
         if (nodeId == null) {
             nodeServiceConsumer.getNodeServices().forEach { it.clearAllLoggers(loggerTags) }
         } else {
-            nodeServiceConsumer.getNodeService(nodeId)?.let { service ->
-                service.clearAllLoggers(loggerTags)
-            }
+            nodeServiceConsumer.getNodeService(nodeId)?.clearAllLoggers(loggerTags)
         }
     }
 
@@ -145,9 +149,7 @@ class BlueManagerImpl @Inject constructor(
         if (nodeId == null) {
             nodeServiceConsumer.getNodeServices().forEach { it.enableAllLoggers(loggerTags) }
         } else {
-            nodeServiceConsumer.getNodeService(nodeId)?.let { service ->
-                service.enableAllLoggers(loggerTags)
-            }
+            nodeServiceConsumer.getNodeService(nodeId)?.enableAllLoggers(loggerTags)
         }
     }
 
@@ -223,6 +225,77 @@ class BlueManagerImpl @Inject constructor(
         emit(Resource.error(R.string.blue_st_sdk_error_ble_scan_failed, data = null))
     }
 
+    val leList = mutableListOf<LeNode>()
+
+    @SuppressLint("MissingPermission")
+    override suspend fun scanLeNodes(): Flow<Resource<List<LeNode>>> = callbackFlow {
+
+        if (context.hasBluetoothPermission().not()) {
+            throw IllegalStateException("Missing BlueTooth Permissions")
+        }
+
+        stopDeviceScan = false
+        leList.clear()
+
+        val bleScanner = bleManager.adapter.bluetoothLeScanner
+
+        trySend(Resource.loading())
+
+        val scanCallback = object : ScanCallback() {
+            override fun onScanFailed(errorCode: Int) {
+                super.onScanFailed(errorCode)
+                bleScanner.stopScan(this)
+                trySend(
+                    Resource.error(
+                        R.string.blue_st_sdk_error_ble_scan_failed, errorCode, null
+                    )
+                )
+                close()
+            }
+
+            override fun onScanResult(callbackType: Int, result: ScanResult?) {
+                super.onScanResult(callbackType, result)
+                result?.let {
+                    if (stopDeviceScan.not()) {
+                        if (createOrUpdateLeDeviceToCollection(listOf(LeBlueSTSDKAdvertiseFilter()), it)) {
+                            launch {
+                                trySend(
+                                    Resource.loading(leList)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        val scanSettings =
+            ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
+
+        bleScanner.startScan(listOf(), scanSettings, scanCallback)
+
+        launch {
+            withTimeoutOrNull(scanPeriod) {
+                while (stopDeviceScan.not()) {
+                    delay(200)
+                }
+            }
+
+            trySend(
+                Resource.success(leList)
+            )
+            close()
+        }
+
+        awaitClose {
+            bleScanner.stopScan(scanCallback)
+        }
+
+    }.flowOn(Dispatchers.IO).catch { e ->
+        Log.e(TAG, "scan exception", e)
+        emit(Resource.error(R.string.blue_st_sdk_error_ble_scan_failed, data = null))
+    }
+
     private suspend fun getNodes(services: List<NodeService>): List<Node> =
         services.map { service -> getFirmwareInfo(service) }
 
@@ -238,10 +311,11 @@ class BlueManagerImpl @Inject constructor(
             //List of fws update ordered by fw version
             val listOfFwUpdate = catalog.getFw(
                 deviceId = catalogInfo.bleDevId, fwName = catalogInfo.fwName
-            ).filter { it.fota.fwUrl != null }.filter { it.fwVersion > catalogInfo.fwVersion }.sortedBy { it.fwVersion }
+            ).filter { it.fota.fwUrl != null }.filter { it.fwVersion > catalogInfo.fwVersion }
+                .sortedBy { it.fwVersion }
 
             //Search if there is a mandatory update
-            val fwMandatory = listOfFwUpdate.firstOrNull { it.fota.mandatory==true }
+            val fwMandatory = listOfFwUpdate.firstOrNull { it.fota.mandatory == true }
 
             //the update will be the mandatory one, or the latest available
             val fwUpdate = fwMandatory ?: listOfFwUpdate.maxByOrNull { it.fwVersion }
@@ -257,12 +331,17 @@ class BlueManagerImpl @Inject constructor(
         } ?: node
     }
 
-    override suspend fun getNodeWithFirmwareInfo(nodeId: String): Node {
-        val nodeService = nodeServiceConsumer.getNodeService(nodeId) ?: throw IllegalStateException(
-            "Unable to find NodeService for $nodeId"
-        )
+    override suspend fun getNodeWithFirmwareInfo(nodeId: String): Node? {
+        val nodeService = nodeServiceConsumer.getNodeService(nodeId)
+        if (nodeService == null) {
+            Log.i(TAG, "Unable to find NodeService for $nodeId")
+        }
 
-        return getFirmwareInfo(nodeService)
+        return if (nodeService != null)
+            getFirmwareInfo(nodeService)
+        else {
+            null
+        }
     }
 
     override fun stopScan() {
@@ -308,41 +387,94 @@ class BlueManagerImpl @Inject constructor(
         return false
     }
 
+    @Synchronized
+    private fun createOrUpdateLeDeviceToCollection(
+        filters: List<LeAdvertiseFilter>, scanResult: ScanResult
+    ): Boolean {
+
+        val advertisingData = scanResult.scanRecord ?: return false
+
+        if (filters.isNotEmpty()) {
+            val nodeId = scanResult.device.address
+            val advertiseInfo =
+                filters.asSequence().map { it.decodeAdvertiseData( nodeId,advertisingData.bytes) }
+                    .filter { advInfo -> advInfo != null }.firstOrNull() ?: return false
+
+            //check if there is already one device
+            val address = leList.indexOfFirst {it -> it.device.address == scanResult.device.address}
+
+            if(address != -1){
+                //Update the device
+                leList[address] = LeNode(scanResult.device, advertiseInfo)
+            } else {
+                //Add new device
+                leList.add(LeNode(scanResult.device, advertiseInfo))
+            }
+
+            //leList.add(LeNode(scanResult.device, advertiseInfo))
+
+            return true
+        }
+
+        return false
+    }
+
     private fun hasService(deviceAddress: String) =
         nodeServiceConsumer.getNodeService(deviceAddress) != null
 
     @SuppressLint("MissingPermission")
-    override fun connectToNode(nodeId: String, maxPayloadSize: Int, enableServer: Boolean): Flow<Node> {
-        val nodeService = nodeServiceConsumer.getNodeService(nodeId) ?: throw IllegalStateException(
-            "Unable to find NodeService for $nodeId"
-        )
-
+    override fun connectToNode(
+        nodeId: String,
+        maxPayloadSize: Int,
+        enableServer: Boolean
+    ): Flow<Node> {
+        val nodeService = nodeServiceConsumer.getNodeService(nodeId)
+        if (nodeService == null) {
+            Log.i(TAG, "Unable to find NodeService for $nodeId")
+        }
         stopScan()
 
-        serverWasEnable = enableServer
-        connectFromNode(node = nodeService.bleHal.getDevice())
+        if (nodeService != null) {
+            serverWasEnable = enableServer
+            connectFromNode(node = nodeService.bleHal.getDevice())
 
-        return nodeService.connectToNode(autoConnect = false, maxPayloadSize = maxPayloadSize)
+            return nodeService.connectToNode(autoConnect = false, maxPayloadSize = maxPayloadSize)
+        } else {
+            return emptyFlow()
+        }
     }
 
 
     override fun getNode(nodeId: String) = nodeServiceConsumer.getNodeService(nodeId)?.getNode()
 
-    override fun getNodeStatus(nodeId: String) =
-        (nodeServiceConsumer.getNodeService(nodeId)?.getDeviceStatus()
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId"))
+    override fun getNodeStatus(nodeId: String): Flow<Node> {
+        val nodeService = nodeServiceConsumer.getNodeService(nodeId)
+        if (nodeService == null) {
+            return emptyFlow<Node>()
+        } else {
+            return nodeService.getDeviceStatus()
+        }
+    }
 
     override fun getRssi(nodeId: String) {
-        (nodeServiceConsumer.getNodeService(nodeId)?.getRssi()
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId"))
+        (nodeServiceConsumer.getNodeService(nodeId)?.getRssi())
     }
-    override fun isConnected(nodeId: String): Boolean =
-        nodeServiceConsumer.getNodeService(nodeId)?.isConnected()
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
 
-    override fun isReady(nodeId: String): Boolean =
-        nodeServiceConsumer.getNodeService(nodeId)?.isReady()
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+    override fun isConnected(nodeId: String): Boolean {
+        val nodeService = nodeServiceConsumer.getNodeService(nodeId)
+        if (nodeService == null) {
+            Log.i(TAG, "Unable to find NodeService for $nodeId")
+        }
+        return nodeService?.isConnected() == true
+    }
+
+    override fun isReady(nodeId: String): Boolean {
+        val nodeService = nodeServiceConsumer.getNodeService(nodeId)
+        if (nodeService == null) {
+            Log.i(TAG, "Unable to find NodeService for $nodeId")
+        }
+        return nodeService?.isReady() == true
+    }
 
     @SuppressLint("MissingPermission")
     override fun disconnect(nodeId: String?) {
@@ -360,9 +492,8 @@ class BlueManagerImpl @Inject constructor(
 
     override fun nodeFeatures(nodeId: String): List<Feature<*>> {
         val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
-
-        return service.getNodeFeatures()
+        //?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        return service?.getNodeFeatures() ?: listOf()
     }
 
     override suspend fun enableFeatures(
@@ -370,9 +501,10 @@ class BlueManagerImpl @Inject constructor(
         onFeaturesEnabled: CoroutineScope.() -> Unit
     ): Boolean {
         val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        //?: throw IllegalStateException("Unable to find NodeService for $nodeId")
 
-        return service.setFeaturesNotifications(features = features, true,onFeaturesEnabled)
+        return service?.setFeaturesNotifications(features = features, true, onFeaturesEnabled)
+            ?: false
     }
 
     override suspend fun disableFeatures(
@@ -382,7 +514,7 @@ class BlueManagerImpl @Inject constructor(
         try {
 
             val service = nodeServiceConsumer.getNodeService(nodeId)
-                //?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+            //?: throw IllegalStateException("Unable to find NodeService for $nodeId")
 
             service?.let {
                 result = service.setFeaturesNotifications(features = features, false)
@@ -400,9 +532,8 @@ class BlueManagerImpl @Inject constructor(
         onFeaturesEnabled: CoroutineScope.() -> Unit
     ): Flow<FeatureUpdate<*>> {
         val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
-
-        return service.getFeatureUpdates(features, autoEnable, onFeaturesEnabled)
+        //?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        return service?.getFeatureUpdates(features, autoEnable, onFeaturesEnabled) ?: emptyFlow()
     }
 
     override suspend fun readFeature(
@@ -411,45 +542,51 @@ class BlueManagerImpl @Inject constructor(
         timeout: Long
     ): List<FeatureUpdate<*>> {
         val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        //?: throw IllegalStateException("Unable to find NodeService for $nodeId")
 
-        return service.readFeature(
+        return service?.readFeature(
             feature = feature,
             responseTimeout = timeout
         )
+            ?: listOf()
     }
 
     override suspend fun writeDebugMessage(nodeId: String, msg: String): Boolean {
         val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        //?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        return service?.writeDebugMessage(msg) ?: false
+    }
 
-        return service.writeDebugMessage(msg)
+    override fun hasBleDebugService(nodeId: String): Boolean {
+        val service = nodeServiceConsumer.getNodeService(nodeId)
+        return service?.debugService?.hasBleDebugService() ?: false
     }
 
     override fun getConfigControlUpdates(nodeId: String): Flow<FeatureResponse> {
 
         val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
-
-        return service.getConfigControlUpdates()
+        //?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        return service?.getConfigControlUpdates() ?: emptyFlow()
     }
 
     override fun getDebugMessages(nodeId: String): Flow<DebugMessage> {
         val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
-        return service.getDebugMessages()
+        // ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        return service?.getDebugMessages() ?: emptyFlow()
     }
 
     override fun getChunkProgressUpdates(nodeId: String): Flow<ChunkProgress> {
         val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
-        return service.getChunkProgressUpdates()
+        //?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        return service?.getChunkProgressUpdates() ?: emptyFlow()
     }
 
     override suspend fun resetChunkProgressUpdates(nodeId: String) {
         val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
-        service.resetChunkProgressUpdates()
+        //?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        service?.let {
+            service.resetChunkProgressUpdates()
+        }
     }
 
     override suspend fun writeFeatureCommand(
@@ -459,10 +596,9 @@ class BlueManagerImpl @Inject constructor(
         retry: Int,
         retryDelay: Long
     ): FeatureResponse? {
-        val service = nodeServiceConsumer.getNodeService(nodeId)
-            ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
+        // ?: throw IllegalStateException("Unable to find NodeService for $nodeId")
 
-        return service.writeFeatureCommand(
+        return nodeServiceConsumer.getNodeService(nodeId)?.writeFeatureCommand(
             featureCommand = featureCommand,
             responseTimeout = responseTimeout,
             retry = retry,
@@ -470,23 +606,30 @@ class BlueManagerImpl @Inject constructor(
         )
     }
 
-    override suspend fun getDtmiModel(nodeId: String,isBeta: Boolean): DtmiModel? {
+    override suspend fun getDtmiModel(nodeId: String, isBeta: Boolean): DtmiModel? {
         val nodeService = nodeServiceConsumer.getNodeService(nodeId) ?: return null
         val advInfo = nodeService.getNode().advertiseInfo ?: return null
         return advInfo.getFwInfo()?.let {
-            catalog.getDtmiModel(it.deviceId, it.fwId,isBeta)
+            catalog.getDtmiModel(it.deviceId, it.fwId, isBeta)
         }
     }
 
     override suspend fun getBoardCatalog(): List<BoardFirmware> = catalog.getBoardCatalog()
 
-    override suspend fun getBoardsDescription(): List<BoardDescription>  = catalog.getBoardsDescription()
+    override suspend fun getBoardsDescription(): List<BoardDescription> =
+        catalog.getBoardsDescription()
 
-    override suspend fun reset(url: String?) {catalog.reset(url)}
+    override suspend fun reset(url: String?, hideNotReleaseFwMaturity: Boolean?) {
+        catalog.reset(url = url, hideNotReleaseFwMaturity = hideNotReleaseFwMaturity)
+    }
+
+    override suspend fun setHideNotReleaseFwMaturity(hideNotReleaseFwMaturity: Boolean) {
+        catalog.setHideNotReleaseFwMaturity(hideNotReleaseFwMaturity)
+    }
 
     override suspend fun setBoardCatalog(
         fileUri: Uri, contentResolver: ContentResolver
-    ): Pair<List<BoardFirmware>,String?> = catalog.setBoardCatalog(fileUri, contentResolver)
+    ): Pair<List<BoardFirmware>, String?> = catalog.setBoardCatalog(fileUri, contentResolver)
 
 
     override suspend fun setDtmiModel(
@@ -515,10 +658,10 @@ class BlueManagerImpl @Inject constructor(
     }
 
     override suspend fun getSensorAdapter(uniqueId: Int): Sensor? {
-       return catalog.getSensorAdapter(uniqueId=uniqueId)
+        return catalog.getSensorAdapter(uniqueId = uniqueId)
     }
 
-    override suspend fun getBleCharacteristics() : List<BleCharacteristic> {
+    override suspend fun getBleCharacteristics(): List<BleCharacteristic> {
         return catalog.getBleCharacteristics()
     }
 
@@ -538,7 +681,7 @@ class BlueManagerImpl @Inject constructor(
     private fun connectFromNode(node: Node): Boolean {
         val server = nodeServerConsumer.getNodeServer(node.device.address)
             ?: nodeServerProducer.createServer(node, EXPORTED_MAP)
-        return if(serverWasEnable) {
+        return if (serverWasEnable) {
             server.connectToPeripheral()
         } else {
             false
@@ -548,7 +691,7 @@ class BlueManagerImpl @Inject constructor(
     private fun disconnectFromNode(nodeId: String? = null): Boolean {
         if (nodeId == null) {
             nodeServerConsumer.getNodeServers().forEach {
-                if(serverWasEnable) {
+                if (serverWasEnable) {
                     it.disconnectFromPeripheral()
                 }
             }
@@ -558,7 +701,7 @@ class BlueManagerImpl @Inject constructor(
             return true
         } else {
             nodeServerConsumer.getNodeServer(nodeId)?.let { server ->
-                if(serverWasEnable) {
+                if (serverWasEnable) {
                     server.disconnectFromPeripheral()
                 }
 
